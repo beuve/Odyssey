@@ -87,6 +87,7 @@ pub fn ids_from_str(ids: &str) -> Result<(Uuid, Uuid)> {
     Ok((process_id, product_id))
 }
 
+
 pub fn parse_ecospold2(folder: &Path) -> Result<HashMap<String, EcoSpold>> {
     let activities_paths = fs::read_dir(folder.join("datasets"))?;
     let res: HashMap<String, EcoSpold> = activities_paths

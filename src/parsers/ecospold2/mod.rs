@@ -1,3 +1,4 @@
+use git2::Repository;
 use serde::{Deserialize, Serialize};
 
 use std::fs::{self, File};
@@ -11,6 +12,7 @@ use crate::comput::lca::Database;
 use crate::errors::Result;
 use crate::parsers::ecospold2::build::{build_candidates, build_matrices};
 use crate::parsers::ecospold2::parse::parse_ecospold2;
+use crate::utils::constants::DATABASES_PATH;
 use crate::utils::matrix::{MappedMatrix, MappedVector};
 use crate::utils::search::InventoryItem;
 
@@ -40,6 +42,7 @@ impl Ecoinvent {
         let mut processes = parse_ecospold2(path)?;
         let candidates = build_candidates(&mut processes, version);
         let (technology, intervention) = build_matrices(processes)?;
+        upload_lcia_files()?;
         let ef31 = construct_impact_matrix(version, &intervention)?;
         let mut classifications = HashMap::new();
         classifications.insert("ef31".to_string(), ef31);
@@ -116,4 +119,12 @@ impl Database for Ecoinvent {
         let h = ef.dot(g);
         Ok(h)
     }
+}
+
+fn upload_lcia_files() -> Result<()> {
+    Repository::clone(
+        "https://github.com/ecoinvent/lcia.git",
+        DATABASES_PATH.join("ecoinvent_lcia"),
+    )?;
+    Ok(())
 }

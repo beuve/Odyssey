@@ -7,6 +7,8 @@ pub enum OdysseyErrors {
     #[error("{0:?}")]
     IoError(#[from] io::Error),
     #[error("{0:?}")]
+    GitError(#[from] git2::Error),
+    #[error("{0:?}")]
     CsvError(#[from] csv::Error),
     #[error("{0:?}")]
     XmlError(#[from] quick_xml::Error),

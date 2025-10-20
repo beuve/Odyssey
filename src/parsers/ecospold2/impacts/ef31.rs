@@ -4,7 +4,10 @@ use crate::{
     comput::impacts::ImpactCategory,
     errors::Result,
     parsers::impacts::ef31::EF31Impacts,
-    utils::matrix::{MappedMatrix, MappedMatrixBuilder},
+    utils::{
+        constants::DATABASES_PATH,
+        matrix::{MappedMatrix, MappedMatrixBuilder},
+    },
 };
 
 #[rustfmt::skip]
@@ -126,7 +129,12 @@ pub fn construct_impact_matrix(
     version: &str,
     intervention: &MappedMatrix<String, String>,
 ) -> Result<MappedMatrix<ImpactCategory, String>> {
-    let file = File::open(format!("EF v3.1_mapped_{}.csv", version))?;
+    let file = File::open(
+        DATABASES_PATH
+            .join("ecoinvent_lcia")
+            .join(format!("{}/methods_mapped", version))
+            .join(format!("EF v3.1_mapped_{}.csv", version)),
+    )?;
     let mut rdr = csv::Reader::from_reader(file);
     let mut mat = MappedMatrixBuilder::new();
     mat.copy_rows_into_cols(intervention);
