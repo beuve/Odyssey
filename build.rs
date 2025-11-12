@@ -72,11 +72,8 @@ fn main() {
         .header(format!("{}", wrapper_hdr.display()))
         .clang_arg(format!("-I{}", cxsparse_include.display()))
         .clang_arg(format!("-I{}", suitesparse_config.display()))
-        .blocklist_item("FP_NAN")
-        .blocklist_item("FP_INFINITE")
-        .blocklist_item("FP_ZERO")
-        .blocklist_item("FP_SUBNORMAL")
-        .blocklist_item("FP_NORMAL")
+        .allowlist_function("^(cs[ns]_init)$")
+        .allowlist_function("^(csparse_.*)$")
         .generate()
         .expect("Unable to generate bindings");
 
