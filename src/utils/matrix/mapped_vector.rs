@@ -2,6 +2,9 @@ use bimap::BiHashMap;
 use std::ops::{Add, AddAssign};
 use std::{hash::Hash, sync::Arc};
 
+use crate::utils::matrix::cs::Cs;
+use crate::utils::matrix::MappedMatrix;
+
 /// 2D matrix with `String` values maped to each rows and columns.
 #[derive(Debug, Clone)]
 pub struct MappedVector<T>
@@ -69,6 +72,18 @@ where
     /// This may fail if `id` has no corresponding row.
     pub fn map(&self, id: &T) -> Option<&usize> {
         self.mapping.get_by_left(id)
+    }
+
+    pub fn diag(&self) -> MappedMatrix<T, T> {
+        let n = self.nrows();
+        let cs = Cs::new(
+            n,
+            n,
+            (0i32..=n as i32).collect(),
+            (0i32..n as i32).collect(),
+            self.values.clone(),
+        );
+        MappedMatrix::new(self.mapping.clone(), self.mapping.clone(), cs, None, None)
     }
 }
 

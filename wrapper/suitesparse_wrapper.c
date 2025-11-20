@@ -1,5 +1,4 @@
 #include "suitesparse_wrapper.h"
-#include "cs.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -39,5 +38,6 @@ int csparse_solve(const css *S, const csn *N, int n, const double *rhs,
 
 int csparse_matvec(const cs *A, const double *rhs, double *y) {
   return cs_gaxpy(A, rhs, y);
-  return 1;
 }
+
+cs *csparse_matmat(const cs *A, const cs *B) { return cs_multiply(A, B); }

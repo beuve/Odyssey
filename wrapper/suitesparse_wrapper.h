@@ -12,4 +12,6 @@ int csparse_solve(const css *S, const csn *N, int n, const double *rhs,
 
 int csparse_matvec(const cs *A, const double *rhs, double *y);
 
+cs *csparse_matmat(const cs *A, const cs *B);
+
 #endif

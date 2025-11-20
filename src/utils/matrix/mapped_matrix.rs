@@ -2,7 +2,7 @@ use super::{
     cs::Cs,
     suitesparse::{cs_din, csparse_matvec, csparse_solve},
 };
-use crate::utils::matrix::{csn::Csn, css::Css, MappedVector};
+use crate::utils::matrix::{csn::Csn, css::Css, suitesparse::csparse_matmat, MappedVector};
 use bimap::{BiHashMap, BiMap};
 use serde::{Deserialize, Serialize};
 use sprs::{CsMat, TriMat};
@@ -318,6 +318,27 @@ where
             csparse_matvec(&self.cs.as_ffi(), rhs.values.as_ptr(), res.as_mut_ptr());
         }
         MappedVector::new(self.rows.clone(), res)
+    }
+
+    /// Multiplies two `MappedMatrix`.
+    /// The resulting matrix can't be used to
+    /// solve system
+    pub fn quick_mat_mul<R2, C2>(&mut self, rhs: &mut MappedMatrix<R2, C2>) -> MappedMatrix<R, C2>
+    where
+        R2: std::cmp::Eq + Hash + Clone,
+        C2: std::cmp::Eq + Hash + Clone,
+    {
+        let cs;
+        unsafe {
+            cs = Cs::from_ffi(csparse_matmat(&self.cs.as_ffi(), &rhs.cs.as_ffi()));
+        }
+        MappedMatrix {
+            rows: self.rows.clone(),
+            cols: rhs.cols.clone(),
+            cs,
+            css: None,
+            csn: None,
+        }
     }
 }
 
