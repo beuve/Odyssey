@@ -22,9 +22,16 @@ pub struct DatabaseInfos {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ExchangeLink {
+    File { file: String },
+    Database { database: DatabaseInfos },
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Exchange {
-    database: Option<DatabaseInfos>,
-    file: Option<String>,
+    #[serde(flatten)]
+    link: ExchangeLink,
     location: Option<String>,
     unit: Option<String>,
     name: Option<String>,
@@ -73,49 +80,83 @@ fn import_from_database(
     Ok(())
 }
 
-pub fn import_from_file(
+fn import_from_file(
     path: &Path,
     databases: &mut HashMap<String, Box<dyn Database>>,
     rfs: &mut HashMap<String, MappedVector<String>>,
+    search: &Search,
     amount: f64,
 ) -> Result<()> {
     let file = File::open(path)?;
     let reader = BufReader::new(&file);
     let activity: Activity = serde_json::from_reader(reader)?;
 
-    let search = Search::new()?;
-
     for e in activity.exchanges {
-        match (&e.database, &e.file) {
-            (Some(database_infos), None) => {
-                import_from_database(database_infos, databases, rfs, &search, &e, amount)?
-            }
-            (None, Some(file)) => import_from_file(Path::new(file), databases, rfs, amount * e.amount)?,
-            (Some(_), Some(_)) => panic!(
-                "Both database and file were provided for exchange {:?} in file {:?}",
-                e.name, path
-            ),
-            (None, None) => panic!("No data source (either database or file) was provided for exchange {:?} in file {:?}", e.name, path),
+        import_flow(&e, databases, rfs, search, amount)?;
+    }
+    Ok(())
+}
+
+fn import_flow(
+    e: &Exchange,
+    databases: &mut HashMap<String, Box<dyn Database>>,
+    rfs: &mut HashMap<String, MappedVector<String>>,
+    search: &Search,
+    amount: f64,
+) -> Result<()> {
+    match &e.link {
+        ExchangeLink::File { file } => {
+            import_from_file(Path::new(file), databases, rfs, search, amount * e.amount)?
+        }
+        ExchangeLink::Database { database } => {
+            import_from_database(database, databases, rfs, search, e, amount)?
         }
     }
     Ok(())
 }
 
 pub fn run_lca(path: &Path) -> Result<()> {
-    let mut databases: HashMap<String, Box<dyn Database>> = HashMap::new();
-    let mut rfs: HashMap<String, MappedVector<String>> = HashMap::new();
+    let search = Search::new()?;
 
-    import_from_file(path, &mut databases, &mut rfs, 1f64)?;
+    let file = File::open(path)?;
+    let reader = BufReader::new(&file);
+    let activity: Activity = serde_json::from_reader(reader)?;
 
-    let mut res = ImpactCategory::get_empty_vector();
-    for (db, rf) in rfs.iter() {
-        res += databases.get_mut(db).unwrap().lca(rf)?;
-    }
-
-    for i in 0..res.values.len() {
-        if let Some(ImpactCategory::EF31(v)) = res.mapping.get_by_right(&i) {
-            println!("{:width$?}: {:.4e}", v, res.values[i], width = 20)
+    let mut global_res = ImpactCategory::get_empty_vector();
+    print!("flow");
+    for i in 0..global_res.values.len() {
+        if let Some(ImpactCategory::EF31(e)) = global_res.mapping.get_by_right(&i) {
+            print!(";{:?}", e);
         }
     }
+    println!();
+
+    for e in activity.exchanges {
+        let mut res = ImpactCategory::get_empty_vector();
+        let mut databases: HashMap<String, Box<dyn Database>> = HashMap::new();
+        let mut rfs: HashMap<String, MappedVector<String>> = HashMap::new();
+        import_flow(&e, &mut databases, &mut rfs, &search, 1f64)?;
+
+        for (db, rf) in rfs.iter() {
+            res += databases.get_mut(db).unwrap().lca(rf)?;
+        }
+        global_res += res.clone();
+        print!("{:?}", e.name.unwrap_or("None".to_string()));
+        for i in 0..res.values.len() {
+            if let Some(ImpactCategory::EF31(_)) = res.mapping.get_by_right(&i) {
+                print!(";{:.4e}", res.values[i])
+            }
+        }
+        println!();
+    }
+
+    print!("all");
+    for i in 0..global_res.values.len() {
+        if let Some(ImpactCategory::EF31(_)) = global_res.mapping.get_by_right(&i) {
+            print!(";{:.4e}", global_res.values[i])
+        }
+    }
+    println!();
+
     Ok(())
 }
