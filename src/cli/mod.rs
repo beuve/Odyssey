@@ -1,14 +1,11 @@
-mod create;
 mod database;
 mod run;
 mod search;
 
 use clap::{Parser, Subcommand};
-use create::CreateCommand;
 use database::DatabaseCommandes;
 
 use crate::cli::{
-    create::create_project_folder,
     run::{run_lca, RunCommand},
     search::{cli_search, SearchCommand},
 };
@@ -28,10 +25,6 @@ pub struct Cli {
 impl Cli {
     pub fn exec(self) {
         match self.command {
-            Commands::Create(args) => match create_project_folder(&args.path) {
-                Ok(()) => {}
-                Err(e) => println!("Project could not be created: {:?}", e),
-            },
             Commands::Database(args) => {
                 args.parse();
             }
@@ -49,9 +42,6 @@ impl Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    /// Create a project
-    Create(CreateCommand),
-
     /// Manage database
     #[command(subcommand)]
     Database(DatabaseCommandes),
