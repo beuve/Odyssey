@@ -89,7 +89,7 @@ fn import_from_file(
 ) -> Result<()> {
     let file = File::open(path)?;
     let reader = BufReader::new(&file);
-    let activity: Activity = serde_json::from_reader(reader)?;
+    let activity: Activity = serde_yaml::from_reader(reader)?;
 
     for e in activity.exchanges {
         import_flow(&e, databases, rfs, search, amount)?;
@@ -120,10 +120,10 @@ pub fn run_lca(path: &Path) -> Result<()> {
 
     let file = File::open(path)?;
     let reader = BufReader::new(&file);
-    let activity: Activity = serde_json::from_reader(reader)?;
+    let activity: Activity = serde_yaml::from_reader(reader)?;
 
     let mut global_res = ImpactCategory::get_empty_vector();
-    print!("flow");
+    print!("\"flow\"");
     for i in 0..global_res.values.len() {
         if let Some(ImpactCategory::EF31(e)) = global_res.mapping.get_by_right(&i) {
             print!(";{:?}", e);
@@ -150,7 +150,7 @@ pub fn run_lca(path: &Path) -> Result<()> {
         println!();
     }
 
-    print!("all");
+    print!("\"all\"");
     for i in 0..global_res.values.len() {
         if let Some(ImpactCategory::EF31(_)) = global_res.mapping.get_by_right(&i) {
             print!(";{:.4e}", global_res.values[i])
