@@ -5,7 +5,7 @@ use std::{hash::Hash, sync::Arc};
 use crate::utils::matrix::cs::Cs;
 use crate::utils::matrix::MappedMatrix;
 
-/// 2D matrix with `String` values maped to each rows and columns.
+/// 2D matrix with values maped to each rows and columns.
 #[derive(Debug, Clone)]
 pub struct MappedVector<T>
 where
@@ -94,11 +94,15 @@ macro_rules! MV {
           $label:expr => $val:expr
       ),* $(,)?
     ) => {{
-        let mut vector = MappedVector::new();
+        let mut values = vec![];
+        let mut mapping = ::bimap::BiMap::new();
+        let mut index = 0;
         $(
-            vector.add($label, $val);
+            values.push($val);
+            mapping.insert($label, index);
+            index += 1;
         )*
-        vector
+        $crate::utils::matrix::MappedVector::new(std::sync::Arc::new(mapping), values)
     }};
 }
 
@@ -131,5 +135,16 @@ where
         for (l, r) in self.values.iter_mut().zip(rhs.values) {
             *l += r;
         }
+    }
+}
+
+impl<T> PartialEq for MappedVector<T>
+where
+    T: std::cmp::Eq + Hash + Clone,
+{
+    fn eq(&self, other: &Self) -> bool {
+        let eq_values = self.values == other.values;
+        let eq_mappings = *self.mapping == *other.mapping;
+        eq_values && eq_mappings
     }
 }

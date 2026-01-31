@@ -9,7 +9,7 @@ use sprs::{CsMat, TriMat};
 use std::{collections::HashMap, hash::Hash, sync::Arc, vec};
 use std::{fmt::Debug, vec::Vec};
 
-/// Builder for `MappedMatrix`.
+/// Builder for [MappedMatrix].
 ///
 /// ## Example
 /// ```
@@ -77,7 +77,7 @@ where
         }
     }
 
-    fn triplets_to_csc(self) -> (Vec<i32>, Vec<i32>, Vec<f64>, CsMat<f64>) {
+    fn triplets_to_csc(self) -> Cs {
         // Create a COO (triplet) matrix. This is not done before since sizes are required.
         let mut triplet_mat =
             TriMat::<f64>::with_capacity((self.rows.len(), self.cols.len()), self.triplets.len());
@@ -88,17 +88,20 @@ where
         // Convert COO -> CSC format
         let csc_mat: CsMat<f64> = triplet_mat.to_csc();
 
-        let a_p: Vec<i32> = csc_mat
+        let p: Vec<i32> = csc_mat
             .indptr()
             .as_slice()
             .unwrap()
             .iter()
             .map(|&x| x as i32)
             .collect();
-        let a_i: Vec<i32> = csc_mat.indices().iter().map(|&x| x as i32).collect();
-        let a_x: Vec<f64> = csc_mat.data().to_vec();
+        let i: Vec<i32> = csc_mat.indices().iter().map(|&x| x as i32).collect();
+        let x: Vec<f64> = csc_mat.data().to_vec();
 
-        (a_p, a_i, a_x, csc_mat)
+        let m = csc_mat.rows();
+        let n = csc_mat.cols();
+
+        Cs::new(m, n, p, i, x)
     }
 
     /// Number of rows in the mapped matrix.
@@ -134,11 +137,7 @@ where
     pub fn build(self) -> MappedMatrix<R, C> {
         let cols = self.cols.clone();
         let rows = self.rows.clone();
-        let (a_p, a_i, a_x, mat) = self.triplets_to_csc();
-        let m = mat.rows();
-        let n = mat.cols();
-
-        let mut cs = Cs::new(m, n, a_p, a_i, a_x);
+        let mut cs = self.triplets_to_csc();
         let csn;
         let mut css = Css::new(&mut cs);
         if let Some(css) = css.as_mut() {
@@ -157,7 +156,7 @@ where
     }
 }
 
-/// 2D matrix with `String` values maped to each rows and columns.
+/// 2D matrix with values maped to each rows and columns.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct MappedMatrix<R, C>
 where
@@ -193,29 +192,27 @@ where
     }
 
     /// Returns the index of the row corresponding to `id`.
-    /// This may fail if `id` has no corresponding row.
+    /// This returns [None] if `id` has no corresponding row.
     pub fn row(&self, id: &R) -> Option<&usize> {
         self.rows.get_by_left(id)
     }
 
     /// Returns the index of the column corresponding to `id`.
-    /// This may fail if `id` has no corresponding column.
+    /// This returns [None] if `id` has no corresponding column.
     pub fn col(&self, id: &C) -> Option<&usize> {
         self.cols.get_by_left(id)
     }
 
     /// Returns the value mapped to the row `index`.
-    /// This may fail if `index` is out of range, or
-    /// rare cases, if the row was not mapped to any value
-    /// (although this should not happen).
+    /// This returns [None] if `index` is out of range, or
+    /// if the row was not mapped to any value.
     pub fn irow(&self, index: &usize) -> Option<&R> {
         self.rows.get_by_right(index)
     }
 
     /// Returns the value mapped to the column `index`.
-    /// This may fail if `index` is out of range, or
-    /// rare cases, if the column was not mapped to any value
-    /// (although this should not happen).
+    /// This returns [None] if `index` is out of range, or
+    /// if the column was not mapped to any value.
     pub fn icol(&self, index: &usize) -> Option<&C> {
         self.cols.get_by_right(index)
     }
@@ -255,12 +252,12 @@ where
     ///
     /// # Example
     /// ```
-    /// use odyssey::{MM, utils::matrix::{MappedMatrixBuilder, MappedMatrix}};
+    /// # use odyssey::{MM, MV, utils::matrix::{MappedMatrixBuilder, MappedMatrix}};
     /// let mut A = MM!["a" => { "c" =>  1.0, "d" => 2.0 },
     ///                 "b" => { "c" => -0.1, "d" => 3.0 }];
-    /// let b = vec![10.0, 5.];
+    /// let b = MV!["a" => 10.0, "b" => 5.0];
     /// let x = A.solve(&b);
-    /// assert!(x == vec![6.25, 1.875]);
+    /// assert!(x == MV!["c" => 6.25, "d" => 1.875]);
     /// ```
     pub fn solve(&mut self, rhs: &MappedVector<R>) -> MappedVector<C> {
         assert!(
@@ -305,14 +302,16 @@ where
     ///
     /// # Example
     /// ```
-    /// use odyssey::{MM, MV, utils::matrix::{MappedMatrixBuilder, MappedMatrix}};
+    /// # use odyssey::{MM, MV, utils::matrix::{MappedMatrixBuilder, MappedMatrix, MappedVector}};
+    /// # use std::ops::Add;
     /// let mut A = MM!["a" => { "c" =>  1.0, "d" => 2.0 },
     ///                 "b" => { "c" => -0.1, "d" => 3.0 }];
-    /// let b = MV!["a" => 6.25, "b" => 1.875];
+    /// let b = MV!["c" => 6.25, "d" => 1.875];
     /// let x = A.dot(&b);
-    /// assert!(x == vec![10.0, 5.]);
+    /// assert!(x == MV!["a" => 10.0, "b" => 5.]);
     /// ```
     pub fn dot(&mut self, rhs: &MappedVector<C>) -> MappedVector<R> {
+        println!("{} {} {}", self.cols.len(), self.rows.len(), rhs.nrows());
         let mut res = vec![0f64; self.rows.len()];
         unsafe {
             csparse_matvec(&self.cs.as_ffi(), rhs.values.as_ptr(), res.as_mut_ptr());
@@ -321,8 +320,7 @@ where
     }
 
     /// Multiplies two `MappedMatrix`.
-    /// The resulting matrix can't be used to
-    /// solve system
+    /// The resulting matrix can't be used to solve systems
     pub fn quick_mat_mul<R2, C2>(&mut self, rhs: &mut MappedMatrix<R2, C2>) -> MappedMatrix<R, C2>
     where
         R2: std::cmp::Eq + Hash + Clone,
@@ -397,16 +395,14 @@ mod tests {
       a.add_triplet("3", "4", -0.1);
       a.add_triplet("4", "4", 1.);
       let mut a = a.build();
-      eprintln!("X = {:?}", a);
 
-      let mut b = MappedVector::empty();
+      let mut b = a.zeros_like_rows();
       b.set("0", 50.);
       b.set("1", 0.);
       b.set("2", 0.);
       b.set("3", 0.);
       b.set("4", 0.);
       let x = a.solve(&b);
-      eprintln!("X = {:?}", x);
       assert!(x.values.iter().zip(vec![50.0, 1.0, 10.0, 21.11111, 51.11111]).all(|(a,b)| (a-b).abs() < 1e-5));
     }
 
@@ -430,7 +426,7 @@ mod tests {
       b.add_triplet("0", "3", 0.5);
       b.add_triplet("2", "4", -1.2);
       let mut b = b.build();
-      let mut rhs = MappedVector::empty();
+      let mut rhs = b.zeros_like_cols();
       rhs.set("0", 50.);
       rhs.set("1", 1.);
       rhs.set("2", 10.);
