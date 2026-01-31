@@ -122,9 +122,9 @@ impl Database for Ecoinvent {
 }
 
 fn upload_lcia_files() -> Result<()> {
-    Repository::clone(
-        "https://github.com/ecoinvent/lcia.git",
-        DATABASES_PATH.join("ecoinvent_lcia"),
-    )?;
+    let path = DATABASES_PATH.join("ecoinvent_lcia");
+    if !fs::exists(&path)? {
+        Repository::clone("https://github.com/ecoinvent/lcia.git", path)?;
+    }
     Ok(())
 }
