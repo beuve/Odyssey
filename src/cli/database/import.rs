@@ -24,7 +24,7 @@ use crate::cli::database::DatabaseKind;
 pub struct ImportDatabaseArgs {
     /// Optional output file
     #[arg(short, long, default_value = "none")]
-    pub version: String,
+    pub mersion: String,
 
     /// Optional output file
     #[arg(short, long)]
@@ -34,7 +34,7 @@ pub struct ImportDatabaseArgs {
 }
 
 pub fn import_database(mut infos: ImportDatabaseArgs) -> Result<()> {
-    let name = format!("{:?}_{}", infos.kind, infos.version);
+    let name = format!("{:?}_{}", infos.kind, infos.mersion);
     std::fs::create_dir_all(&*DATABASES_PATH)?;
 
     // Register database in databases.json file
@@ -49,7 +49,7 @@ pub fn import_database(mut infos: ImportDatabaseArgs) -> Result<()> {
     bar.enable_steady_tick(Duration::from_millis(100));
     let cache_path = &*DATABASES_PATH.join(&name);
     let database = match infos.kind {
-        DatabaseKind::Ecoinvent => Ecoinvent::load(&infos.version, data_path, Some(cache_path))?,
+        DatabaseKind::Ecoinvent => Ecoinvent::load(&infos.mersion, data_path, Some(cache_path))?,
     };
     bar.finish_with_message(format!("{} Loading database", style("✓").green()));
 
@@ -70,7 +70,7 @@ fn register_database(infos: &mut ImportDatabaseArgs) -> Result<()> {
         databases = serde_json::from_reader(reader)?;
         if databases
             .iter()
-            .any(|e| e.kind == infos.kind && e.version == infos.version)
+            .any(|e| e.kind == infos.kind && e.mersion == infos.mersion)
         {
             return Ok(());
         }

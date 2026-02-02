@@ -44,7 +44,7 @@ pub fn list_databases() -> Result<()> {
     let reader = BufReader::new(&f);
     let databases: Vec<ImportDatabaseArgs> = serde_json::from_reader(reader)?;
     for d in databases {
-        println!("{:?} {}", d.kind, d.version);
+        println!("{:?} {}", d.kind, d.mersion);
     }
     Ok(())
 }

@@ -33,7 +33,12 @@ impl Ecoinvent {
     /// Save the database data in a cache at the specified `path`.
     fn cache(&self, cache: &Path) -> Result<()> {
         let file = File::create(cache)?;
+        let folder = cache.parent().unwrap();
+        let name = cache.file_stem().unwrap();
+        let numeric_file = folder.join(format!("{:?}.umf", name));
+        self.technology.save_numeric(&numeric_file);
         let writer = BufWriter::new(file);
+
         bincode::serialize_into(writer, self).expect("Failed to serialize");
         Ok(())
     }
@@ -58,9 +63,14 @@ impl Ecoinvent {
     pub fn load(version: &str, path: &Path, cache: Option<&Path>) -> Result<impl Database> {
         if let Some(cache) = cache {
             if fs::exists(cache)? {
-                let file = File::open(cache)?;
+                let file = File::open(path)?;
                 let reader = BufReader::new(file);
-                let data = bincode::deserialize_from(reader)?;
+                let mut data: Ecoinvent = bincode::deserialize_from(reader)?;
+
+                let folder = path.parent().unwrap();
+                let name = path.file_stem().unwrap();
+                let numeric_file = folder.join(format!("{:?}.umf", name));
+                data.technology.load_numeric(&numeric_file);
                 return Ok(data);
             }
         }
@@ -75,7 +85,12 @@ impl Ecoinvent {
         if fs::exists(path)? {
             let file = File::open(path)?;
             let reader = BufReader::new(file);
-            let data: Ecoinvent = bincode::deserialize_from(reader)?;
+            let mut data: Ecoinvent = bincode::deserialize_from(reader)?;
+
+            let folder = path.parent().unwrap();
+            let name = path.file_stem().unwrap();
+            let numeric_file = folder.join(format!("{:?}.umf", name));
+            data.technology.load_numeric(&numeric_file);
             Ok(data)
         } else {
             Err(crate::errors::OdysseyErrors::NoCache(format!(

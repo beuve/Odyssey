@@ -15,8 +15,8 @@ use crate::cli::{
 #[command(propagate_version = true)]
 pub struct Cli {
     /// Global verbosity flag
-    #[arg(short, long, global = true)]
-    verbose: bool,
+    //#[arg(short, long, global = true)]
+    //verbose: bool,
 
     #[command(subcommand)]
     command: Commands,

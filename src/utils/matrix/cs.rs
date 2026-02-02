@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::suitesparse::cs_di;
+use super::suitesparse::{cs_di};
 
 /// Sparse immutable matrix in Compressed Sparse Column (CSC) format.
 ///

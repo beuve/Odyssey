@@ -1,13 +1,16 @@
 use super::{
     cs::Cs,
-    suitesparse::{cs_din, csparse_matvec, csparse_solve},
+    suitesparse::{
+        csparse_matvec, umfpack_get_numeric, umfpack_load_numeric, umfpack_save_numeric,
+        umfpack_solve,
+    },
 };
-use crate::utils::matrix::{csn::Csn, css::Css, suitesparse::csparse_matmat, MappedVector};
+use crate::utils::matrix::{suitesparse::csparse_matmat, MappedVector};
 use bimap::{BiHashMap, BiMap};
 use serde::{Deserialize, Serialize};
 use sprs::{CsMat, TriMat};
-use std::{collections::HashMap, hash::Hash, sync::Arc, vec};
-use std::{fmt::Debug, vec::Vec};
+use std::{collections::HashMap, hash::Hash, os::raw::c_void, path::Path, sync::Arc, vec};
+use std::{ffi::CString, fmt::Debug, vec::Vec};
 
 /// Builder for [MappedMatrix].
 ///
@@ -137,21 +140,24 @@ where
     pub fn build(self) -> MappedMatrix<R, C> {
         let cols = self.cols.clone();
         let rows = self.rows.clone();
-        let mut cs = self.triplets_to_csc();
-        let csn;
-        let mut css = Css::new(&mut cs);
-        if let Some(css) = css.as_mut() {
-            csn = Csn::new(&mut cs, css);
-        } else {
-            csn = None;
+        let cs = self.triplets_to_csc();
+        let mut numeric = std::ptr::null_mut();
+
+        unsafe {
+            umfpack_get_numeric(
+                cs.n as i32,
+                cs.p.as_ptr(),
+                cs.i.as_ptr(),
+                cs.x.as_ptr(),
+                &mut numeric,
+            );
         }
 
         MappedMatrix {
             rows: Arc::new(rows),
             cols: Arc::new(cols),
             cs,
-            css,
-            csn,
+            numeric: Some(numeric),
         }
     }
 }
@@ -166,8 +172,9 @@ where
     rows: Arc<BiHashMap<R, usize>>,
     cols: Arc<BiHashMap<C, usize>>,
     cs: Cs,
-    css: Option<Css>,
-    csn: Option<Csn>,
+
+    #[serde(skip)]
+    pub numeric: Option<*mut c_void>,
 }
 
 impl<R, C> MappedMatrix<R, C>
@@ -179,15 +186,13 @@ where
         rows: Arc<BiHashMap<R, usize>>,
         cols: Arc<BiHashMap<C, usize>>,
         cs: Cs,
-        css: Option<Css>,
-        csn: Option<Csn>,
+        numeric: Option<*mut c_void>,
     ) -> Self {
         Self {
             rows,
             cols,
             cs,
-            css,
-            csn,
+            numeric,
         }
     }
 
@@ -227,6 +232,26 @@ where
         self.cols.len()
     }
 
+    /// Save the numeric value necessary for solving systems
+    pub fn save_numeric(&self, path: &Path) {
+        if self.numeric.is_some() {
+            let path = CString::new(path.to_str().unwrap()).unwrap();
+            unsafe {
+                umfpack_save_numeric(self.numeric.unwrap(), path.as_ptr());
+            }
+        }
+    }
+
+    /// Load the numeric value necessary for solving systems
+    pub fn load_numeric(&mut self, path: &Path) {
+        let path = CString::new(path.to_str().unwrap()).unwrap();
+        let mut numeric = std::ptr::null_mut();
+        unsafe {
+            umfpack_load_numeric(&mut numeric, path.as_ptr());
+        }
+        self.numeric = Some(numeric);
+    }
+
     /// Copy of the columns matrix in a zero valued vector.
     pub fn zeros_like_cols(&self) -> MappedVector<C> {
         MappedVector::new(self.cols.clone(), vec![0.0; self.ncols()])
@@ -260,10 +285,6 @@ where
     /// assert!(x == MV!["c" => 6.25, "d" => 1.875]);
     /// ```
     pub fn solve(&mut self, rhs: &MappedVector<R>) -> MappedVector<C> {
-        assert!(
-            self.css.is_some() && self.csn.is_some(),
-            "Matrix is not invertible"
-        );
         assert_eq!(
             rhs.values.len(),
             self.rows.len(),
@@ -271,27 +292,21 @@ where
         );
         let mut res = vec![0f64; self.cols.len()];
 
-        let css = self.css.as_mut().unwrap();
-        let css = css.as_ffi();
-
-        // Should be in a function and handled with lifetimes
-        let csn = self.csn.as_mut().unwrap();
-        let mut l = csn.l.as_ffi();
-        let mut u = csn.u.as_ffi();
-        let csn = cs_din {
-            L: &mut l as *mut _,
-            U: &mut u as *mut _,
-            pinv: csn.pinv.as_mut_ptr(),
-            B: std::ptr::null_mut(), // Used only for QR
-        };
-
         unsafe {
-            csparse_solve(
-                &css,
-                &csn,
-                self.cs.n as i32,
+            //csparse_solve(
+            //    &css,
+            //    &csn,
+            //    self.cs.n as i32,
+            //    rhs.values.as_ptr(),
+            //    res.as_mut_ptr(),
+            //);
+            umfpack_solve(
+                self.cs.p.as_ptr(),
+                self.cs.i.as_ptr(),
+                self.cs.x.as_ptr(),
                 rhs.values.as_ptr(),
                 res.as_mut_ptr(),
+                self.numeric.unwrap(),
             );
         }
 
@@ -311,7 +326,6 @@ where
     /// assert!(x == MV!["a" => 10.0, "b" => 5.]);
     /// ```
     pub fn dot(&mut self, rhs: &MappedVector<C>) -> MappedVector<R> {
-        println!("{} {} {}", self.cols.len(), self.rows.len(), rhs.nrows());
         let mut res = vec![0f64; self.rows.len()];
         unsafe {
             csparse_matvec(&self.cs.as_ffi(), rhs.values.as_ptr(), res.as_mut_ptr());
@@ -334,8 +348,7 @@ where
             rows: self.rows.clone(),
             cols: rhs.cols.clone(),
             cs,
-            css: None,
-            csn: None,
+            numeric: None,
         }
     }
 }

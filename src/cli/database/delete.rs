@@ -34,7 +34,7 @@ pub fn remove_database(infos: RemoveDatabaseArgs) -> Result<()> {
     let f = File::create(&*DATABASES_FILE)?;
     if let Some(index) = databases
         .iter()
-        .position(|d| d.kind == infos.kind && d.version == infos.version)
+        .position(|d| d.kind == infos.kind && d.mersion == infos.version)
     {
         databases.remove(index);
     } else {

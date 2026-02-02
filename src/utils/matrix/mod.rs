@@ -1,12 +1,13 @@
 mod cs;
-mod csn;
-mod css;
 mod mapped_matrix;
 mod mapped_vector;
 
 #[allow(warnings, clippy::all)]
 mod suitesparse {
-    include!("./suitesparse.rs");
+   include!(concat!(
+        env!("OUT_DIR"),
+        "/suitesparse_bindings.rs"
+    ));
 }
 
 pub use self::mapped_matrix::{MappedMatrix, MappedMatrixBuilder};

@@ -1,3 +1,6 @@
 [submodule "wrapper/suitesparse"]
 	path = wrapper/suitesparse
 	url = https://github.com/DrTimothyAldenDavis/SuiteSparse.git
+[submodule "wrapper/openblas"]
+	path = wrapper/openblas
+	url = https://github.com/OpenMathLib/OpenBLAS.git

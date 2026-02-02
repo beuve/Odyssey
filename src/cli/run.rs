@@ -140,6 +140,7 @@ pub fn run_lca(path: &Path) -> Result<()> {
         for (db, rf) in rfs.iter() {
             res += databases.get_mut(db).unwrap().lca(rf)?;
         }
+
         global_res += res.clone();
         print!("{:?}", e.name.unwrap_or("None".to_string()));
         for i in 0..res.values.len() {

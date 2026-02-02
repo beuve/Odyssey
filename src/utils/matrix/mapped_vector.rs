@@ -83,7 +83,7 @@ where
             (0i32..n as i32).collect(),
             self.values.clone(),
         );
-        MappedMatrix::new(self.mapping.clone(), self.mapping.clone(), cs, None, None)
+        MappedMatrix::new(self.mapping.clone(), self.mapping.clone(), cs, None)
     }
 }
 
